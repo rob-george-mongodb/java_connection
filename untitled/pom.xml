@@ -15,9 +15,14 @@
   </properties>
 
   <dependencies>
+<!--    <dependency>-->
+<!--      <groupId>org.mongodb</groupId>-->
+<!--      <artifactId>mongodb-driver-reactivestreams</artifactId>-->
+<!--      <version>4.11.0</version>-->
+<!--    </dependency>-->
     <dependency>
       <groupId>org.mongodb</groupId>
-      <artifactId>mongodb-driver-reactivestreams</artifactId>
+      <artifactId>mongodb-driver-sync</artifactId>
       <version>4.11.0</version>
     </dependency>
     <dependency>
