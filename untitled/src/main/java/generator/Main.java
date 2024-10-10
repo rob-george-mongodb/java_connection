@@ -52,6 +52,7 @@ public class Main {
   //private static final int BATCH_SIZE = 1000;
   private static final int BATCH_SIZE = 10; //intentionally low for volume
   private static int TARGET_OPEN = 300;
+  static int READ_SPIN = 60;
 
   private static <R extends Runnable> List<R> startThreads(final Supplier<R> runnableSupplier, int n) {
     final List<R> runnableList = new ArrayList<>(n);
@@ -80,6 +81,7 @@ public class Main {
     options.addOption("r", "read", true, "num of read only threads");
     options.addOption("t", "targetOpen", true, "target # of dangling reads per thread");
     options.addOption("w", "cpuWasters", true, "Threads to spin and do nothing");
+    options.addOption("rw", "cpuWastePerReadOp", true, "Time to waste in read, in s");
     DefaultParser parser = new DefaultParser();
     CommandLine cmd = parser.parse(options, args);
 
@@ -91,6 +93,10 @@ public class Main {
 
     if (cmd.hasOption("t")){
       TARGET_OPEN = Integer.parseInt(cmd.getOptionValue("t"));
+    }
+
+    if(cmd.hasOption("rw")){
+      READ_SPIN = Integer.parseInt(cmd.getOptionValue("rw"));
     }
 
     String uri;
@@ -267,11 +273,10 @@ public class Main {
 
     @Override
     public void run() {
-     Thread.sleep(60_000 * );
       while (flag) {
         if (numOpen < TARGET_OPEN) {
           final var startTime = System.nanoTime();
-          var findResult = collection.find(eq("idontexist", "potato")).limit(10);
+          var findResult = collection.find(new Document()).limit(1);
           findResult.subscribe(new Subscriber<Document>() {
             @Override
             public void onSubscribe(final Subscription s) {
@@ -306,7 +311,7 @@ public class Main {
                 updaterLogger.info("Read took " + timeMs + " ms");
               }
               numOpen -= 1;
-              long spinEnd = System.currentTimeMillis() + 60 * 1000; // 1 minute from now
+              long spinEnd = System.currentTimeMillis() + (READ_SPIN * 1000L); // 1 minute from now
               while (System.currentTimeMillis() < spinEnd) {
                 // Perform some calculations to waste CPU
                 double x = Math.random();
