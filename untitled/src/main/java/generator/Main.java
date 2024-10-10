@@ -21,14 +21,10 @@ import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ServerApi;
 import com.mongodb.ServerApiVersion;
-//import com.mongodb.reactivestreams.client.MongoClient;
-//import com.mongodb.reactivestreams.client.MongoClients;
-//import com.mongodb.reactivestreams.client.MongoCollection;
-//import com.mongodb.reactivestreams.client.MongoDatabase;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
+import com.mongodb.reactivestreams.client.MongoClient;
+import com.mongodb.reactivestreams.client.MongoClients;
+import com.mongodb.reactivestreams.client.MongoCollection;
+import com.mongodb.reactivestreams.client.MongoDatabase;
 import java.util.stream.Collectors;
 import net.datafaker.Address;
 import net.datafaker.Animal;
@@ -180,9 +176,9 @@ public class Main {
     try (MongoClient mongoClient = MongoClients.create(settings)) {
       MongoDatabase database = mongoClient.getDatabase("test_smaller");
       MongoCollection<Document> collection = database.getCollection("test");
-//      var thing = collection.createIndex(new Document("whatWasId", 1));
-//      var indexName = Mono.from(thing).block();
-//      throughputLogger.error("got index name " + indexName);
+      var thing = collection.createIndex(new Document("whatWasId", 1));
+      var indexName = Mono.from(thing).block();
+      throughputLogger.error("got index name " + indexName);
 
       //ArrayBlockingQueue<Document> queue = new ArrayBlockingQueue<>(100000);
       //AtomicLong counter = new AtomicLong(0);
@@ -278,10 +274,44 @@ public class Main {
     @Override
     public void run() {
       while (flag) {
-
+        if (numOpen < TARGET_OPEN) {
           final var startTime = System.nanoTime();
           var findResult = collection.find(new Document()).limit(1);
-          long spinEnd = System.currentTimeMillis() + (READ_SPIN * 1000L); // 1 minute from now
+          findResult.subscribe(new Subscriber<Document>() {
+            @Override
+            public void onSubscribe(final Subscription s) {
+              numOpen += 1;
+              s.request(Long.MAX_VALUE);
+//              try {
+//                //Thread.sleep(30_000);
+//              } catch (InterruptedException pE) {
+//                updaterLogger.error("Got exception on crazy wait", pE);
+//              }
+            }
+
+            @Override
+            public void onNext(final Document pDocument) {
+              updaterLogger.info("got next");
+
+            }
+
+            @Override
+            public void onError(final Throwable t) {
+              updaterLogger.error("Exception on read ", t);
+              numOpen -= 1;
+            }
+
+            @Override
+            public void onComplete() {
+              final var endTime = System.nanoTime();
+              final var timeMs = (endTime - startTime) / 100_000;
+              if (timeMs > 200) {
+                updaterLogger.info("Read took a long time " + timeMs + " ms");
+              } else {
+                updaterLogger.info("Read took " + timeMs + " ms");
+              }
+              numOpen -= 1;
+              long spinEnd = System.currentTimeMillis() + (READ_SPIN * 1000L); // 1 minute from now
               while (System.currentTimeMillis() < spinEnd) {
                 // Perform some calculations to waste CPU
                 double x = Math.random();
@@ -289,51 +319,10 @@ public class Main {
                 double z = Math.pow(x, y);
               }
               updaterLogger.info("Done wasting CPU");
-//          findResult.subscribe(new Subscriber<Document>() {
-//            @Override
-//            public void onSubscribe(final Subscription s) {
-//              numOpen += 1;
-//              s.request(Long.MAX_VALUE);
-////              try {
-////                //Thread.sleep(30_000);
-////              } catch (InterruptedException pE) {
-////                updaterLogger.error("Got exception on crazy wait", pE);
-////              }
-//            }
-//
-//            @Override
-//            public void onNext(final Document pDocument) {
-//              updaterLogger.info("got next");
-//
-//            }
-//
-//            @Override
-//            public void onError(final Throwable t) {
-//              updaterLogger.error("Exception on read ", t);
-//              numOpen -= 1;
-//            }
-//
-//            @Override
-//            public void onComplete() {
-//              final var endTime = System.nanoTime();
-//              final var timeMs = (endTime - startTime) / 100_000;
-//              if (timeMs > 200) {
-//                updaterLogger.info("Read took a long time " + timeMs + " ms");
-//              } else {
-//                updaterLogger.info("Read took " + timeMs + " ms");
-//              }
-//              numOpen -= 1;
-//              long spinEnd = System.currentTimeMillis() + (READ_SPIN * 1000L); // 1 minute from now
-//              while (System.currentTimeMillis() < spinEnd) {
-//                // Perform some calculations to waste CPU
-//                double x = Math.random();
-//                double y = Math.random();
-//                double z = Math.pow(x, y);
-//              }
-//              updaterLogger.info("Done wasting CPU");
-//            }
-//          });
-//        }
+            }
+          });
+
+        }
       }
     }
 
@@ -363,26 +352,26 @@ public class Main {
 
     @Override
     public void run() {
-//      while (flag) {
-//        long id = random.nextLong(minId, maxId + 1);
-//        Document query = new Document().append("whatWasId", id);
-//        try {
-//          final var startTime = System.nanoTime();
-//          var replacePublisher = collection.findOneAndUpdate(query, Updates.set("whatWasId", id+1), new FindOneAndUpdateOptions().projection(new Document().append("_id", 1)));
-//          Mono.from(replacePublisher).block();
-//          final var endTime = System.nanoTime();
-//          long duration = (endTime - startTime) / 1_000_000;
-//          if(duration >= 200){
-//            updaterLogger.warn("update took a long time " + duration);
-//          } else {
-//            updaterLogger.trace("update took " + duration);
-//          }
-//
-//          counter.incrementAndGet();
-//        } catch (Exception e) {
-//          updaterLogger.error("update failed: " + e);
-//        }
-//      }
+      while (flag) {
+        long id = random.nextLong(minId, maxId + 1);
+        Document query = new Document().append("whatWasId", id);
+        try {
+          final var startTime = System.nanoTime();
+          var replacePublisher = collection.findOneAndUpdate(query, Updates.set("whatWasId", id+1), new FindOneAndUpdateOptions().projection(new Document().append("_id", 1)));
+          Mono.from(replacePublisher).block();
+          final var endTime = System.nanoTime();
+          long duration = (endTime - startTime) / 1_000_000;
+          if(duration >= 200){
+            updaterLogger.warn("update took a long time " + duration);
+          } else {
+            updaterLogger.trace("update took " + duration);
+          }
+
+          counter.incrementAndGet();
+        } catch (Exception e) {
+          updaterLogger.error("update failed: " + e);
+        }
+      }
     }
 
     public void stop() {
@@ -426,8 +415,7 @@ public class Main {
         try {
           final var startTime = System.nanoTime();
           var result = collection.insertMany(buffer);
-          result.getInsertedIds();
-          //Mono.from(result).block();
+          Mono.from(result).block();
           final var endTime = System.nanoTime();
           final var duration_millis = (endTime - startTime) / 1_000_000;
           if(duration_millis >= 200){
