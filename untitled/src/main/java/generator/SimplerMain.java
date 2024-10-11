@@ -187,9 +187,9 @@ public class SimplerMain {
                 }
 
                 if(NUM_IN_PROGRESS_OPS > READ_QUEUE_DEPTH){
-                    logger.warn("Queue depth exceeded");
+                    logger.trace("Queue depth exceeded");
                     try{
-                        Thread.sleep(100);
+                        Thread.sleep(1000);
                     } catch (InterruptedException e){
                         logger.error("Interrupted", e);
                     }
@@ -256,9 +256,9 @@ public class SimplerMain {
                 }
 
                 if(NUM_IN_PROGRESS_OPS > WRITE_QUEUE_DEPTH){
-                    logger.warn("Queue depth exceeded");
+                    logger.trace("Queue depth exceeded");
                     try{
-                        Thread.sleep(100);
+                        Thread.sleep(1000);
                     } catch (InterruptedException e){
                         logger.error("Interrupted", e);
                     }
