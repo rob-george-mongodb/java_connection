@@ -24,6 +24,13 @@
     </encoder>
   </appender>
 
+  <appender name="serverMonitorListener" class="ch.qos.logback.core.FileAppender">
+    <file>logs/server-monitor-listener.log</file>
+    <encoder>
+      <pattern>%date %level [%thread] %logger{10} [%file:%line] %msg%n</pattern>
+    </encoder>
+  </appender>
+
   <appender name="driver" class="ch.qos.logback.core.FileAppender">
     <file>logs/driverNoRotation.log</file>
     <encoder>
@@ -83,6 +90,11 @@
 
   <logger name="socket" level="trace">
     <appender-ref ref="tcp"/>
+  </logger>
+
+  <logger name="server-monitor-listener" level="info">
+    <appender-ref ref="stdout"/>
+    <appender-ref ref="serverMonitorListener"/>
   </logger>
 
   <logger name="throughput" level="trace">
