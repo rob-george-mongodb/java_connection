@@ -59,6 +59,9 @@ public class SimplerMain {
         options.addOption("rt", "readThreads", true, "Number of read threads");
         options.addOption("rq", "readQueueDepth", true,
             "Number of max outstanding async ops per read thread");
+        options.addOption("cp", "connectionPool", true, "Connection pool size");
+        options.addOption("st", "serverTimeout", true, "Server selection timeout in ms");
+        options.addOption("ht", "heartbeatFrequency", true, "Heartbeat frequency in ms");
         DefaultParser parser = new DefaultParser();
         CommandLine cmd = parser.parse(options, args);
 
@@ -113,6 +116,18 @@ public class SimplerMain {
                         event.getElapsedTime(TimeUnit.MILLISECONDS), event.getThrowable());
                 }
             }));
+
+        if (cmd.hasOption("cp")) {
+            settingsBuilder.applyToConnectionPoolSettings(builder ->
+                builder.maxSize(Integer.parseInt(cmd.getOptionValue("cp"))));
+        }
+        if(cmd.hasOption("st")) {
+            settingsBuilder.applyToClusterSettings(builder -> builder.serverSelectionTimeout(Integer.parseInt(cmd.getOptionValue("st")), TimeUnit.MILLISECONDS));
+        }
+
+        if(cmd.hasOption("ht")){
+            settingsBuilder.applyToServerSettings(builder -> builder.heartbeatFrequency(Integer.parseInt(cmd.getOptionValue("ht")), TimeUnit.MILLISECONDS));
+        }
 
         MongoClientSettings settings = settingsBuilder.build();
 
