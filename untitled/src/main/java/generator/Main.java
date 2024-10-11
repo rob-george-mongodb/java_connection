@@ -5,6 +5,10 @@ import static com.mongodb.client.model.Filters.eq;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.connection.TransportSettings;
+import com.mongodb.event.ServerHeartbeatFailedEvent;
+import com.mongodb.event.ServerHeartbeatStartedEvent;
+import com.mongodb.event.ServerHeartbeatSucceededEvent;
+import com.mongodb.event.ServerMonitorListener;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -167,6 +171,26 @@ public class Main {
     }
 
     settingsBuilder.applyToConnectionPoolSettings(builder -> builder.maxSize(1_500));
+    final Logger heartbeatLogger = LoggerFactory.getLogger("monitor");
+    settingsBuilder.applyToServerSettings(builder ->
+    builder.addServerMonitorListener(
+        new ServerMonitorListener() {
+          @Override
+          public void serverHearbeatStarted(final ServerHeartbeatStartedEvent event) {
+            heartbeatLogger.info("Heartbeat started {}", event);
+          }
+
+          @Override
+          public void serverHeartbeatSucceeded(final ServerHeartbeatSucceededEvent event) {
+            heartbeatLogger.info("Heartbeat succeeded {}", event);
+          }
+
+          @Override
+          public void serverHeartbeatFailed(final ServerHeartbeatFailedEvent event) {
+            heartbeatLogger.error("Heartbeat failed {}", event);
+          }
+        }
+    ));
 
     MongoClientSettings settings = settingsBuilder.build();
     AtomicLong docId = new AtomicLong(startId);
