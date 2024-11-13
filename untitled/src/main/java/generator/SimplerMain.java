@@ -9,9 +9,15 @@ import com.mongodb.event.ServerHeartbeatFailedEvent;
 import com.mongodb.event.ServerHeartbeatStartedEvent;
 import com.mongodb.event.ServerHeartbeatSucceededEvent;
 import com.mongodb.event.ServerMonitorListener;
+import com.mongodb.lang.Nullable;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoClients;
 import com.mongodb.reactivestreams.client.MongoCollection;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -25,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 
@@ -33,6 +40,9 @@ public class SimplerMain {
     private static final Logger LOGGER = LoggerFactory.getLogger("server-monitor-listener");
     private static int WRITE_QUEUE_DEPTH = 1; // High write volumes can easily overwhelm lower tier clusters
     private static int READ_QUEUE_DEPTH = 1000; // They handle crazy read ops perfectly
+
+    @Nullable
+    private static String error_reporting_url = null;
 
 
     private static <R extends Runnable> List<R> startThreads(final Supplier<R> runnableSupplier, int n) {
@@ -62,6 +72,7 @@ public class SimplerMain {
         options.addOption("cp", "connectionPool", true, "Connection pool size");
         options.addOption("st", "serverTimeout", true, "Server selection timeout in ms");
         options.addOption("ht", "heartbeatFrequency", true, "Heartbeat frequency in ms");
+        options.addOption("ee", "errorEndpoint", true, "Endpoint to POST errors to");
         DefaultParser parser = new DefaultParser();
         CommandLine cmd = parser.parse(options, args);
 
@@ -151,6 +162,11 @@ public class SimplerMain {
             WRITE_QUEUE_DEPTH = Integer.parseInt(cmd.getOptionValue("wq"));
         }
 
+        if(cmd.hasOption("ee")){
+            error_reporting_url = cmd.getOptionValue("ee");
+            postCurrentTime();
+        }
+
         try (MongoClient mongoClient = MongoClients.create(settings)) {
             MongoCollection<Document> collection = mongoClient.getDatabase("test")
                 .getCollection("test");
@@ -180,6 +196,35 @@ public class SimplerMain {
 
     }
 
+
+    // copilot generated - probably waaay more verbose than necessary
+    public static void postCurrentTime() {
+        if(error_reporting_url == null){
+            return;
+        }
+        try {
+            URL url = new URL(error_reporting_url);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json; utf-8");
+            connection.setDoOutput(true);
+
+            String jsonInputString = "{\"currentTime\": \"" + Instant.now().toString() + "\"}";
+
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                LOGGER.error("POST request failed with response code: " + responseCode);
+            }
+        } catch (Exception e) {
+            LOGGER.error("Exception caught while posting current time", e);
+        }
+    }
+
     public static class TrivialReader implements Runnable{
         private volatile boolean flag = true;
         private final MongoCollection<Document> collection;
@@ -198,6 +243,7 @@ public class SimplerMain {
                     collection.find().limit(1).subscribe(new ReadSubscriber());
                     NUM_IN_PROGRESS_OPS++;
                 } catch (MongoException e){
+                    postCurrentTime();
                     logger.error("Exception caught", e);
                 }
 
@@ -267,6 +313,7 @@ public class SimplerMain {
                     collection.insertOne(new Document("key", "value")).subscribe(new WriteSubscriber());
                     NUM_IN_PROGRESS_OPS++;
                 } catch (MongoException e){
+                    postCurrentTime();
                     logger.error("Exception caught", e);
                 }
 
