@@ -86,6 +86,7 @@ public class Main {
     options.addOption("t", "targetOpen", true, "target # of dangling reads per thread");
     options.addOption("w", "cpuWasters", true, "Threads to spin and do nothing");
     options.addOption("rw", "cpuWastePerReadOp", true, "Time to waste in read, in s");
+    options.addOption("ee", "errorEndpoint", true, "Endpoint to POST errors to");
     DefaultParser parser = new DefaultParser();
     CommandLine cmd = parser.parse(options, args);
 

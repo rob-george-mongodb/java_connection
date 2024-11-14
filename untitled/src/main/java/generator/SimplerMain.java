@@ -164,7 +164,7 @@ public class SimplerMain {
 
         if(cmd.hasOption("ee")){
             error_reporting_url = cmd.getOptionValue("ee");
-            postCurrentTime();
+            postCurrentTime("starting up now - using " + connectionString);
         }
 
         try (MongoClient mongoClient = MongoClients.create(settings)) {
@@ -198,7 +198,7 @@ public class SimplerMain {
 
 
     // copilot generated - probably waaay more verbose than necessary
-    public static void postCurrentTime() {
+    public static void postCurrentTime(String body) {
         if(error_reporting_url == null){
             return;
         }
@@ -209,7 +209,8 @@ public class SimplerMain {
             connection.setRequestProperty("Content-Type", "application/json; utf-8");
             connection.setDoOutput(true);
 
-            String jsonInputString = "{\"currentTime\": \"" + Instant.now().toString() + "\"}";
+            var escapedJson = body.replace("\"", "\\\"");
+            String jsonInputString = "{\"currentTime\": \"" + Instant.now().toString() + "\", \"body\":\"" + escapedJson +  "\"}";
 
             try (OutputStream os = connection.getOutputStream()) {
                 byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
@@ -242,8 +243,10 @@ public class SimplerMain {
                 try{
                     collection.find().limit(1).subscribe(new ReadSubscriber());
                     NUM_IN_PROGRESS_OPS++;
+
+                    var doc = Mono.from(collection.find().limit(1)).block();
                 } catch (MongoException e){
-                    postCurrentTime();
+                    postCurrentTime(e.toString());
                     logger.error("Exception caught", e);
                 }
 
@@ -280,7 +283,7 @@ public class SimplerMain {
             @Override
             public void onError(Throwable t){
                 long elapsedMs = (System.nanoTime() - nanoTime) / 1_000_000;
-                postCurrentTime();
+                postCurrentTime(t.toString());
                 logger.error("Error inserting document; took {}", elapsedMs, t);
             }
 
@@ -314,7 +317,7 @@ public class SimplerMain {
                     collection.insertOne(new Document("key", "value")).subscribe(new WriteSubscriber());
                     NUM_IN_PROGRESS_OPS++;
                 } catch (MongoException e){
-                    postCurrentTime();
+                    postCurrentTime(e.toString());
                     logger.error("Exception caught", e);
                 }
 
@@ -351,7 +354,7 @@ public class SimplerMain {
             @Override
             public void onError(Throwable t){
                 long elapsedMs = (System.nanoTime() - nanoTime) / 1_000_000;
-                postCurrentTime();
+                postCurrentTime(t.toString());
                 logger.error("Error inserting document; took {}", elapsedMs, t);
             }
 
