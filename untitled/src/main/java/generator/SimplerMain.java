@@ -73,6 +73,7 @@ public class SimplerMain {
         options.addOption("st", "serverTimeout", true, "Server selection timeout in ms");
         options.addOption("ht", "heartbeatFrequency", true, "Heartbeat frequency in ms");
         options.addOption("ee", "errorEndpoint", true, "Endpoint to POST errors to");
+        options.addOption("mc", "numMongoClients", true, "Number of mongo clients to create");
         DefaultParser parser = new DefaultParser();
         CommandLine cmd = parser.parse(options, args);
 
@@ -167,9 +168,23 @@ public class SimplerMain {
             postCurrentTime("starting up now - using " + connectionString);
         }
 
-        try (MongoClient mongoClient = MongoClients.create(settings)) {
-            MongoCollection<Document> collection = mongoClient.getDatabase("test")
+        final int numMongoClients;
+        if(cmd.hasOption("mc")){
+            numMongoClients = Integer.parseInt(cmd.getOptionValue("mc"));
+        } else {
+            numMongoClients = 1;
+        }
+
+        List<MongoClient> mongoClients = new ArrayList<>();
+        for(int i = 0; i < numMongoClients; i++){
+            mongoClients.add(MongoClients.create(settings));
+        }
+
+        int i = 0;
+        for(MongoClient client: mongoClients){
+            MongoCollection<Document> collection = client.getDatabase("test" + i)
                 .getCollection("test");
+            i += 1;
             List<CpuWaster> wasters = startThreads(CpuWaster::new, numWasters);
             List<TrivialWriter> writers = startThreads(() -> new TrivialWriter(collection),
                 numWriters);
@@ -181,17 +196,25 @@ public class SimplerMain {
                 writers.forEach(TrivialWriter::stop);
                 readers.forEach(TrivialReader::stop);
             }));
-
-            final Logger logger = LoggerFactory.getLogger("timings");
-            //noinspection InfiniteLoopStatement
-            while (true) {
-                try {
-                    Mono.from(collection.find().first()).block();
-                } catch (MongoException e) {
-                    logger.error("Exception caught in main", e);
+        }
+        //noinspection InfiniteLoopStatement
+        boolean hasInserted = false;
+        final Logger logger = LoggerFactory.getLogger("timings");
+        while (true) {
+            try (MongoClient mongoClient = MongoClients.create(settings)) {
+                var db = mongoClient.getDatabase("eachTimeThing");
+                var collection = db.getCollection("collection");
+                if(!hasInserted) {
+                    collection.insertOne(new Document());
                 }
+                Flux.from(collection.find().limit(1)).blockFirst();
+                collection.find().first();
+            } catch (MongoException e) {
+                logger.error("Exception caught in main", e);
+                postCurrentTime(e.toString());
             }
         }
+
 
 
     }
