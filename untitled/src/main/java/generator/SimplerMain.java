@@ -280,6 +280,7 @@ public class SimplerMain {
             @Override
             public void onError(Throwable t){
                 long elapsedMs = (System.nanoTime() - nanoTime) / 1_000_000;
+                postCurrentTime();
                 logger.error("Error inserting document; took {}", elapsedMs, t);
             }
 
@@ -350,6 +351,7 @@ public class SimplerMain {
             @Override
             public void onError(Throwable t){
                 long elapsedMs = (System.nanoTime() - nanoTime) / 1_000_000;
+                postCurrentTime();
                 logger.error("Error inserting document; took {}", elapsedMs, t);
             }
 
